@@ -52,7 +52,7 @@ Content of *Version.proj*:
         <GitCommitsIgnoreMerges>true</GitCommitsIgnoreMerges>
     </PropertyGroup>
     <ImportGroup>
-        <Import Project="SlVer/Version.proj" />
+        <Import Project="StirlingLabs.Version/Version.proj" />
     </ImportGroup>
 </Project>
 ```
@@ -64,6 +64,8 @@ At the _project level_, an import to the solution-level *Version.proj* file shou
     <Import Project="../Version.proj" />
   </ImportGroup>
 ```
+Note that the directory indirection (`../`) here assumes the solution is one directory above the project's directory.
+You may need to adjust this as necessary.
 
 
 Example *StirlingLabsExampleProject.csproj* file is as follows;
