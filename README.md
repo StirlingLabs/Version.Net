@@ -23,7 +23,7 @@ A submodule should also be added at the _solution level_.
 
 The command line operation is as follows;
 ```sh
-> git submodule add -- "git@github.com:StirlingLabs/Version.Net.git" "StirlingLabs.Version"
+> git submodule add -b master -- "git@github.com:StirlingLabs/Version.Net.git" "StirlingLabs.Version"
 ```
 
 
@@ -32,6 +32,7 @@ The resulting *.gitmodules* should read as follows;
 [submodule "StirlingLabs.Version"]
 	path = StirlingLabs.Version
 	url = git@github.com:StirlingLabs/Version.Net.git
+    branch = master
 ```
 
 Also at the _solution level_, a *Version.proj* file should be created.
