@@ -16,7 +16,22 @@ It uses [SourceLink](https://github.com/dotnet/sourcelink/) and [GitInfo](https:
 To create a new version, just create a new tag in "vYY.M.update" format.  This can be done automatically for you;
 
 ```sh
-> dotnet msbuild -target:Publish
+> dotnet msbuild -t:CreateTag
+```
+
+If you have a solution with more than one project, you will get an error;
+```
+Microsoft (R) Build Engine version 16.9.0+57a23d249 for .NET
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+MSBUILD : error MSB1011: Specify which project or solution file to use because this folder contains more than one project or solution file.
+
+```
+
+That's ok, you can just tell it to just use one of your projects in the solution.
+
+```sh
+> dotnet msbuild -t:CreateTag MyProject
 ```
 
 or you can do it manually if you need the control;
