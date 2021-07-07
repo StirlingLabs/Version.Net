@@ -38,7 +38,7 @@
             <IsValidGitBaseVersion>true</IsValidGitBaseVersion>
         </PropertyGroup>
         -->
-        <Message Importance="high" Text="Picked Tag: $(GitBaseTag)" />
+        <!--<Message Importance="high" Text="Picked Tag: $(GitBaseTag)" />-->
     </Target>
     <Target Name="ApplyGitInfo" DependsOnTargets="PickGitBaseTag;GitInfo;GitVersion;InitializeSourceControlInformation">
         <ItemGroup>
