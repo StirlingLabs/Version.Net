@@ -89,7 +89,7 @@
         <!-- the major and minor recommended versions will always be from the current date -->
         <PropertyGroup>
             <GitSemVerMajor>$([System.DateTime]::Now.ToString(`yy`))</GitSemVerMajor>
-            <GitSemVerMajor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMajor>
+            <GitSemVerMinor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMinor>
         </PropertyGroup>
 
         <!-- debugging output -->
@@ -157,7 +157,7 @@
             <PackageVersion>$(Version.Split('+',2)[0])</PackageVersion>
 
             <!-- assembly versions don't support leading zeroes -->
-            <GitSemVerMajorForAsmVer Condition="$(GitSemVerMinor.StartsWith('0'))">1$(GitSemVerMinor)</GitSemVerMajorForAsmVer>
+            <GitSemVerMajorForAsmVer Condition="$(GitSemVerMajor.StartsWith('0'))">1$(GitSemVerMajor)</GitSemVerMajorForAsmVer>
             <GitSemVerMinorForAsmVer>$(GitSemVerMinor.TrimStart('0'))</GitSemVerMinorForAsmVer>
             <GitSemVerMinorForAsmVer Condition="'$(GitSemVerMinorForAsmVer)'==''">0</GitSemVerMinorForAsmVer>
             <AssemblyVersion>$(GitSemVerMajor).$(GitSemVerMinorForAsmVer).$(GitSemVerPatch)</AssemblyVersion>
