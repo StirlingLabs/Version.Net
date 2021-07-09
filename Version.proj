@@ -1,4 +1,4 @@
-<!-- all projects should invoke ApplyGitInfo by default -->
+<!-- all projects should invoke ApplyGitInfo by default before building, compiling or packing artifacts -->
 <Project>
     
     <!-- add package references to all including projects -->
