@@ -1,93 +1,126 @@
 <!-- all projects should invoke ApplyGitInfo by default before building, compiling or packing artifacts -->
 <Project>
-    
     <!-- add package references to all including projects -->
     <ItemGroup>
-      <PackageReference Include="GitInfo" Version="2.1.2" PrivateAssets="All"/>
-      <PackageReference Include="Microsoft.Build.Tasks.Git" Version="1.0.0" PrivateAssets="All"/>
-      <PackageReference Include="Microsoft.SourceLink.Common" Version="1.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.Build.Tasks.Git" Version="1.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.SourceLink.Common" Version="1.0.0" PrivateAssets="All"/>
     </ItemGroup>
-    
+
     <!-- configuration for sourcelink and gitinfo -->
     <PropertyGroup>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <EnableSourceLink Condition="'$(RepositoryUrl)'!=''">true</EnableSourceLink>
         <ContinuousIntegrationBuild Condition="'$(CI)'!=''">true</ContinuousIntegrationBuild>
         <DeterministicSourcePaths Condition="'$(ContinuousIntegrationBuild)'!=''">$(ContinuousIntegrationBuild)</DeterministicSourcePaths>
-        <GitThisAssembly>false</GitThisAssembly>
-        <IncludeSymbols Condition="'$(DebugSymbols)'=='false'">false</IncludeSymbols>
-        <GitSkipCache>true</GitSkipCache>
-        <GitDefaultVersion>$([System.DateTime]::Now.ToString(`yy`)).$([System.DateTime]::Now.ToString(`MM`)).0</GitDefaultVersion>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-        <!-- debugging output -->
-        <!--<GitInfoReportImportance>high</GitInfoReportImportance>-->
+        <!-- only set IncludeSymbols if DebugSymbols is also specified -->
+        <IncludeSymbols Condition="'$(DebugSymbols)'!='false'">true</IncludeSymbols>
+        <IncludeSymbols Condition="'$(DebugSymbols)'=='false'">false</IncludeSymbols>
     </PropertyGroup>
-    
+
+    <!-- constants -->
+    <PropertyGroup>
+        <SemVerRegex>v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)(?:\-(?&lt;LABEL&gt;[\dA-Za-z\-\.]+))?$|^v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)\.(?&lt;PATCH&gt;\d+)(?:\-(?&lt;LABEL&gt;[\dA-Za-z\-\.]+))?$|^(?&lt;LABEL&gt;[\dA-Za-z\-\.]+)\-v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)\.(?&lt;PATCH&gt;\d+)$</SemVerRegex>
+
+        <!-- reports things like the resulting version string -->
+        <VersionNetInfoImportance>high</VersionNetInfoImportance>
+
+        <!-- set this to high for debugging output -->
+        <VersionNetDebugImportance>low</VersionNetDebugImportance>
+    </PropertyGroup>
+
     <!-- support for sourcelink to github -->
     <ItemGroup Condition="$(RepositoryUrl.StartsWith('https://github.com/'))">
-      <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All"/>
     </ItemGroup>
-    
-    <!-- pick the highest tag by sort rather than by relevance after GitInfo picks some other tag -->
-    <Target Name="PickGitBaseTag" DependsOnTargets="_GitBaseVersionTagExists">
-        <!-- reverse-sort tags by descending v:refname and pick the top, should be latest semver -->
-        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-              Command="$(GitExe) for-each-ref refs/tags/ --count=1 --sort=-v:refname --format=%%(refname&#x3a;short)">
-            <Output TaskParameter="ConsoleOutput" PropertyName="GitBaseTag" />
-            <Output TaskParameter="ExitCode" PropertyName="PickGitTagExitCode" />
+
+    <Target Name="CheckIfGitIsDirty">
+        <!-- refresh the index -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true"
+              Command="git update-index --refresh" />
+
+        <!-- determine if there are any uncommitted changes -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true"
+              Command="git diff-index --quiet HEAD --">
+            <Output TaskParameter="ExitCode" PropertyName="GitIsDirty"/>
         </Exec>
 
         <!-- debugging output -->
-        <!--<Message Importance="high" Text="Picked Tag: $(GitBaseTag)" />-->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Git Is Dirty: $(GitIsDirty)" />
+    </Target>
+
+    <Target Name="PickGitBaseTag" DependsOnTargets="CheckIfGitIsDirty">
+        <!-- windows has a thing about percent signs being for environment variable expansion -->
+        <PropertyGroup>
+            <EscPct>%</EscPct>
+        </PropertyGroup>
+        <PropertyGroup Condition="$(OS.StartsWith('Windows'))">
+            <EscPct>%%</EscPct>
+        </PropertyGroup>
+
+        <!-- reverse-sort tags by descending v:refname and pick the top, should be latest semver -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              Command="git for-each-ref &quot;refs/tags/v[1-9]*&quot; --count=1 --sort=-v:refname &quot;--format=$(EscPct)(refname:short)&quot;">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitBaseTag"/>
+        </Exec>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Picked Tag: $(GitBaseTag)" />
+
+        <!-- we picked a tag -->
+        <PropertyGroup Condition="'$(GitBaseTag)'!=''">
+            <GitSemVerSource>Tag</GitSemVerSource>
+            <GitBaseVersionMajor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MAJOR'].Value)</GitBaseVersionMajor>
+            <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
+            <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
+            <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
+        </PropertyGroup>
+        
+        <!-- we did not pick a tag -->
+        <PropertyGroup Condition="'$(GitBaseTag)'==''">
+            <GitSemVerSource>Default</GitSemVerSource>
+            <GitBaseVersionMajor>$([System.DateTime]::Now.ToString(`yy`))</GitBaseVersionMajor>
+            <GitBaseVersionMinor>$([System.DateTime]::Now.ToString(`MM`))</GitBaseVersionMinor>
+            <GitBaseVersionPatch>0</GitBaseVersionPatch>
+            <GitSemVerPatch>0</GitSemVerPatch>
+        </PropertyGroup>
+        
+        <PropertyGroup>
+            <GitSemVerMajor>$(GitBaseVersionMajor)</GitSemVerMajor>
+            <GitSemVerMinor>$(GitBaseVersionMinor)</GitSemVerMinor>
+        </PropertyGroup>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Parsed Tag: $(GitBaseVersionMajor) $(GitBaseVersionMinor) $(GitBaseVersionPatch)" />
     </Target>
 
     <!-- determine versioning scheme from tag and environment and apply it -->
-    <Target Name="ApplyGitInfo" DependsOnTargets="PickGitBaseTag;GitInfo;GitVersion;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;CoreCompile;Pack">
+    <Target Name="ApplyGitInfo" DependsOnTargets="CheckIfGitIsDirty;PickGitBaseTag;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;CoreCompile;Pack">
+
         <!-- create  hashes to help identify what machine built the artifact -->
         <ItemGroup>
-            <MachineItemToHash Include="$([System.Environment]::MachineName)" />
-            <MachineItemToHash Include="$([System.Environment]::ProcessorCount)" />
+            <MachineItemToHash Include="$([System.Environment]::MachineName)"/>
+            <MachineItemToHash Include="$([System.Environment]::ProcessorCount)"/>
         </ItemGroup>
         <Hash ItemsToHash="@(MachineItemToHash)">
-            <Output TaskParameter="HashResult" PropertyName="MachineUniqueHash" />
-        </Hash>
-
-        <!-- create hashes to help identify what user built the artifact -->
-        <ItemGroup>
-            <UserItemToHash Include="$([System.Environment]::UserName)" Condition="'$(GITHUB_ACTOR)'==''" />
-            <UserItemToHash Include="$(GITHUB_ACTOR)" Condition="'$(GITHUB_ACTOR)'!=''" />
-        </ItemGroup>
-        <Hash ItemsToHash="@(UserItemToHash)">
-            <Output TaskParameter="HashResult" PropertyName="UserUniqueHash" />
+            <Output TaskParameter="HashResult" PropertyName="MachineUniqueHash"/>
         </Hash>
 
         <!-- debugging output -->
-        <!--
-        <Message Importance="high" Text="Machine Unique Hash: $(MachineUniqueHash)"/>
-        <Message Importance="high" Text="User Unique Hash: $(UserUniqueHash)"/>
-        -->
-        <!-- <CallTarget Targets="GitInfoReport"/> -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Machine Unique Hash: $(MachineUniqueHash)"/>
 
-        <!-- force default version to be relative to current year and month -->
-        <PropertyGroup Condition="'$(GitSemVerSource)'=='Default'">
-            <GitSemVerMajor>$([System.DateTime]::Now.ToString(`yy`))</GitSemVerMajor>
-            <GitSemVerMinor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMinor>
-            <GitSemVerPatch>0</GitSemVerPatch>
-        </PropertyGroup>
+        <!-- create hashes to help identify what user built the artifact -->
+        <ItemGroup>
+            <UserItemToHash Include="$([System.Environment]::UserName)" Condition="'$(GITHUB_ACTOR)'==''"/>
+            <UserItemToHash Include="$(GITHUB_ACTOR)" Condition="'$(GITHUB_ACTOR)'!=''"/>
+        </ItemGroup>
+        <Hash ItemsToHash="@(UserItemToHash)">
+            <Output TaskParameter="HashResult" PropertyName="UserUniqueHash"/>
+        </Hash>
 
-        <!-- force current version to be relative to current year and month -->
-        <PropertyGroup Condition="'$(GitSemVerSource)'=='Tag'">
-            <GitSemVerMajor>$([System.DateTime]::Now.ToString(`yy`))</GitSemVerMajor>
-            <GitSemVerMinor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMinor>
-        </PropertyGroup>
-
-        <!-- if we don't match the current tag assume we rolled over to new month -->
-        <PropertyGroup Condition="'$(GitBaseVersionMajor)' != '$(GitSemVerMajor)' Or '$(GitBaseVersionMinor)' != '$(GitSemVerMinor)'">
-            <IsNewMinorVersion>true</IsNewMinorVersion>
-            <GitSemVerPatch>0</GitSemVerPatch>
-        </PropertyGroup>
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="User Unique Hash: $(UserUniqueHash)"/>
 
         <!-- create a timestamp that resolves to minutes since an epoch -->
         <PropertyGroup>
@@ -99,49 +132,60 @@
             <Timestamp>$([System.UInt64]::Parse($(TimestampInteger)).ToString('x'))</Timestamp>
         </PropertyGroup>
 
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Timestamp: $(TimestampInteger) -> $(Timestamp)"/>
+
         <!-- ultimately determine the version from the status of git -->
         <PropertyGroup>
+            <!-- ci builds may mess with the working tree, pretend it's not dirty -->
             <GitIsDirty Condition="'$(GitIsDirty)'!='0' And '$(ContinuousIntegrationBuild)'=='true'">0</GitIsDirty>
+            
+            <!-- build the version suffix accordingly -->
             <VersionSuffix Condition="'$(GitIsDirty)'!='0' And '$(VersionSuffix)'==''">-pre-$(Timestamp)</VersionSuffix>
-            <VersionSuffix Condition="'$(GitIsDirty)'!='0'">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,4))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
-            <VersionPrefix Condition="'$(VersionPrefix)'=='1.0.0'" />
-            <!-- CI build or non-dirty: year.month.update+commit -->
-            <!-- non-CI dirty: year.month.update-pre-timestamp+machine+user.commit -->
-            <!-- note: sourcelink will append the commit hash -->
+            <VersionSuffix Condition="'$(GitIsDirty)'!='0'">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,3))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
+            <VersionPrefix Condition="'$(VersionPrefix)'=='1.0.0'"/>
+
+            <!-- build the full semver 2.0 string
+             - CI build or non-dirty: year.month.update+commit
+             - non-CI dirty: year.month.update-pre-timestamp+machine+user.commit
+             - note: sourcelink will append the commit hash as well as embed it in the assembly
+             -->
             <Version>$(VersionPrefix)$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)$(VersionSuffix)</Version>
+
+            <!-- nupkg versions want the +... part removed -->
+            <PackageVersion>$(Version.Split('+',2)[0])</PackageVersion>
+
+            <!-- assembly versions don't support leading zeroes -->
+            <GitSemVerMajorForAsmVer Condition="$(GitSemVerMinor.StartsWith('0'))">1$(GitSemVerMinor)</GitSemVerMajorForAsmVer>
             <GitSemVerMinorForAsmVer>$(GitSemVerMinor.TrimStart('0'))</GitSemVerMinorForAsmVer>
             <GitSemVerMinorForAsmVer Condition="'$(GitSemVerMinorForAsmVer)'==''">0</GitSemVerMinorForAsmVer>
             <AssemblyVersion>$(GitSemVerMajor).$(GitSemVerMinorForAsmVer).$(GitSemVerPatch)</AssemblyVersion>
+
+            <!-- file versions have limited number ranges and no leading zeroes -->
             <FileVersion>$(AssemblyVersion).0</FileVersion>
-            <PackageVersion>$(Version.Split('+',2)[0])</PackageVersion>
         </PropertyGroup>
 
         <!-- debugging output -->
-        <!--<Message Importance="high" Text="Minimum Version: $(GitBaseVersionMajor).$(GitBaseVersionMinor).0"/>-->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Minimum Version: $(GitBaseVersionMajor).$(GitBaseVersionMinor).0"/>
 
         <!-- report version information to user -->
-        <Message Importance="high" Text="Version: $(Version)"/>
-        <Message Importance="high" Text="Commit: $(SourceRevisionId)"/>
+        <Message Importance="$(VersionNetInfoImportance)" Text="Version: $(Version)"/>
+        <Message Importance="$(VersionNetInfoImportance)" Text="Commit: $(SourceRevisionId)"/>
     </Target>
 
     <!-- user invoked creation of a tag in git -->
     <Target Name="CreateTag" DependsOnTargets="ApplyGitInfo">
-        <!-- check if the version we're to create has a predecessor tag -->
-        <PropertyGroup Condition="'$(GitSemVerSource)'=='Tag'">
-            <GitSemVerPatch Condition="'$(IsNewMinorVersion)'!='true'">$([MsBuild]::Add($(GitSemVerPatch),1))</GitSemVerPatch>
-        </PropertyGroup>
-
         <!-- build the tag string; add the 'v' prefix and don't add any suffix to the tag -->
         <PropertyGroup>
             <NewTag>v$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)</NewTag>
         </PropertyGroup>
 
         <!-- debugging output -->
-        <!--<Message Importance="high" Text="Checking Tag: $(NewTag)"/>-->
+        <Message Importance="$(VersionNetDebugImportance)" Text="Checking Tag: $(NewTag)"/>
 
         <!-- have git create a tag for this version -->
-        <Exec Command="$(GitExe) tag $(NewTag)" ContinueOnError="true" IgnoreExitCode="true">
-            <Output TaskParameter="ExitCode" PropertyName="GitCreateTagExitCode" />
+        <Exec Command="git tag $(NewTag)" ContinueOnError="true" IgnoreExitCode="true">
+            <Output TaskParameter="ExitCode" PropertyName="GitCreateTagExitCode"/>
         </Exec>
 
         <!-- report to user tag was created if successful -->
