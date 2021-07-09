@@ -68,7 +68,7 @@
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="Picked Tag: $(GitBaseTag)" />
 
-        <!-- we picked a tag -->
+        <!-- we picked a tag, extract components -->
         <PropertyGroup Condition="'$(GitBaseTag)'!=''">
             <GitSemVerSource>Tag</GitSemVerSource>
             <GitBaseVersionMajor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MAJOR'].Value)</GitBaseVersionMajor>
@@ -77,7 +77,7 @@
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
         </PropertyGroup>
         
-        <!-- we did not pick a tag -->
+        <!-- we did not pick a tag, set defaults -->
         <PropertyGroup Condition="'$(GitBaseTag)'==''">
             <GitSemVerSource>Default</GitSemVerSource>
             <GitBaseVersionMajor>$([System.DateTime]::Now.ToString(`yy`))</GitBaseVersionMajor>
@@ -86,9 +86,10 @@
             <GitSemVerPatch>0</GitSemVerPatch>
         </PropertyGroup>
         
+        <!-- the major and minor recommended versions will always be from the current date -->
         <PropertyGroup>
-            <GitSemVerMajor>$(GitBaseVersionMajor)</GitSemVerMajor>
-            <GitSemVerMinor>$(GitBaseVersionMinor)</GitSemVerMinor>
+            <GitSemVerMajor>$([System.DateTime]::Now.ToString(`yy`))</GitSemVerMajor>
+            <GitSemVerMajor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMajor>
         </PropertyGroup>
 
         <!-- debugging output -->
