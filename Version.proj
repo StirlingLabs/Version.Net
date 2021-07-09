@@ -1,5 +1,5 @@
 <!-- all projects should invoke ApplyGitInfo by default -->
-<Project DefaultTargets="ApplyGitInfo">
+<Project>
     
     <!-- add package references to all including projects -->
     <ItemGroup>
@@ -44,7 +44,7 @@
     </Target>
 
     <!-- determine versioning scheme from tag and environment and apply it -->
-    <Target Name="ApplyGitInfo" DependsOnTargets="PickGitBaseTag;GitInfo;GitVersion;InitializeSourceControlInformation">
+    <Target Name="ApplyGitInfo" DependsOnTargets="PickGitBaseTag;GitInfo;GitVersion;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;CoreCompile;Pack">
         <!-- create  hashes to help identify what machine built the artifact -->
         <ItemGroup>
             <MachineItemToHash Include="$([System.Environment]::MachineName)" />
@@ -95,25 +95,30 @@
             <TimestampEpoch>637450560000000000</TimestampEpoch> <!-- jan 1st, 2021 -->
             <TimestampResolution>600000000</TimestampResolution> <!-- minutes -->
             <TimestampTicks>$([System.DateTime]::UtcNow.Ticks)</TimestampTicks>
-            <Timestamp>$([System.Math]::Floor($([MsBuild]::Divide($([MsBuild]::Subtract($(TimestampTicks),$(TimestampEpoch))),$(TimestampResolution)))))</Timestamp>
-            <Timestamp>$([System.UInt64]::Parse($(Timestamp)).ToString('x'))</Timestamp>
+            <TimestampInteger>$([System.Math]::Floor($([MsBuild]::Divide($([MsBuild]::Subtract($(TimestampTicks),$(TimestampEpoch))),$(TimestampResolution)))))</TimestampInteger>
+            <Timestamp>$([System.UInt64]::Parse($(TimestampInteger)).ToString('x'))</Timestamp>
         </PropertyGroup>
 
         <!-- ultimately determine the version from the status of git -->
         <PropertyGroup>
             <GitIsDirty Condition="'$(GitIsDirty)'!='0' And '$(ContinuousIntegrationBuild)'=='true'">0</GitIsDirty>
-            <VersionSuffix Condition="'$(GitIsDirty)'=='0' And '$(SourceRevisionId)'!=''">$(VersionSuffix)+$(SourceRevisionId.Substring(0,7))</VersionSuffix>
             <VersionSuffix Condition="'$(GitIsDirty)'!='0' And '$(VersionSuffix)'==''">-pre-$(Timestamp)</VersionSuffix>
             <VersionSuffix Condition="'$(GitIsDirty)'!='0'">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,4))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
             <VersionPrefix Condition="'$(VersionPrefix)'=='1.0.0'" />
             <!-- CI build or non-dirty: year.month.update+commit -->
-            <!-- non-CI dirty: year.month.update-pre-timestamp+machine/user -->
+            <!-- non-CI dirty: year.month.update-pre-timestamp+machine+user.commit -->
+            <!-- note: sourcelink will append the commit hash -->
             <Version>$(VersionPrefix)$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)$(VersionSuffix)</Version>
+            <GitSemVerMinorForAsmVer>$(GitSemVerMinor.TrimStart('0'))</GitSemVerMinorForAsmVer>
+            <GitSemVerMinorForAsmVer Condition="'$(GitSemVerMinorForAsmVer)'==''">0</GitSemVerMinorForAsmVer>
+            <AssemblyVersion>$(GitSemVerMajor).$(GitSemVerMinorForAsmVer).$(GitSemVerPatch)</AssemblyVersion>
+            <FileVersion>$(AssemblyVersion).0</FileVersion>
+            <PackageVersion>$(Version.Split('+',2)[0])</PackageVersion>
         </PropertyGroup>
 
         <!-- debugging output -->
         <!--<Message Importance="high" Text="Minimum Version: $(GitBaseVersionMajor).$(GitBaseVersionMinor).0"/>-->
-        <!--<Message Importance="high" Text="Version: $(Version)"/>-->
+        <Message Importance="high" Text="Version: $(Version)"/>
     </Target>
 
     <!-- user invoked creation of a tag in git -->
