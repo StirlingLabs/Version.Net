@@ -118,7 +118,10 @@
 
         <!-- debugging output -->
         <!--<Message Importance="high" Text="Minimum Version: $(GitBaseVersionMajor).$(GitBaseVersionMinor).0"/>-->
+
+        <!-- report version information to user -->
         <Message Importance="high" Text="Version: $(Version)"/>
+        <Message Importance="high" Text="Commit: $(SourceRevisionId)"/>
     </Target>
 
     <!-- user invoked creation of a tag in git -->
