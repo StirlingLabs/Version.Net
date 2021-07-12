@@ -80,7 +80,7 @@
         </PropertyGroup>
 
         <!-- check if the tag is a prerelease by looking for an existing tag -->
-        <Exec Condition="'$(GitBaseTag)'!='' '$(GitBaseVersionLabel)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+        <Exec Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
             Command="git rev-parse v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch) --">
             <Output TaskParameter="ConsoleOutput" PropertyName="GitReleaseTagParseResult"/>
             <Output TaskParameter="ExitCode" PropertyName="GitReleaseTagParseExitCode"/>
