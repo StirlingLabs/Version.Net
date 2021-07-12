@@ -13,6 +13,7 @@
         <ContinuousIntegrationBuild Condition="'$(CI)'!=''">true</ContinuousIntegrationBuild>
         <DeterministicSourcePaths Condition="'$(ContinuousIntegrationBuild)'!=''">$(ContinuousIntegrationBuild)</DeterministicSourcePaths>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
 
         <!-- only set IncludeSymbols if DebugSymbols is also specified -->
         <IncludeSymbols Condition="'$(DebugSymbols)'!='false'">true</IncludeSymbols>
@@ -165,6 +166,9 @@
             <VersionSuffix Condition="'$(GitIsDirty)'!='0' And '$(VersionSuffix)'==''">-pre-$(Timestamp)</VersionSuffix>
             <VersionSuffix Condition="'$(GitIsDirty)'!='0'">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,3))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
             <VersionPrefix Condition="'$(VersionPrefix)'=='1.0.0'"/>
+
+            <!-- the version suffix should include the label from the tag if not dirty -->
+            <VersionSuffix Condition="'$(GitIsDirty)'=='0' And '$(GitBaseVersionLabel)'!=''">-$(GitBaseVersionLabel)$(VersionSuffix)</VersionSuffix>
 
             <!-- build the full semver 2.0 string
              - CI build or non-dirty: year.month.update+commit
