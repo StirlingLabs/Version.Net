@@ -74,6 +74,19 @@
             <GitBaseVersionMajor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MAJOR'].Value)</GitBaseVersionMajor>
             <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
             <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
+            <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
+            <!-- only increment the patch if there is not a label on the tag, it is either a hotfix or a prerelease -->
+            <GitSemVerPatch Condition="'$(GitBaseVersionLabel)'==''">$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
+        </PropertyGroup>
+
+        <!-- check if the tag is a prerelease by looking for an existing tag -->
+        <Exec Condition="'$(GitBaseTag)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              Command="git rev-parse v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitReleaseTagParseResult"/>
+        </Exec>
+
+        <!-- if the tag exists, bump the version number -->
+        <PropertyGroup Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!='' And '$(GitReleaseTagParseResult)'!=''">
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
         </PropertyGroup>
         
