@@ -80,13 +80,14 @@
         </PropertyGroup>
 
         <!-- check if the tag is a prerelease by looking for an existing tag -->
-        <Exec Condition="'$(GitBaseTag)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-              Command="git rev-parse v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)">
+        <Exec Condition="'$(GitBaseTag)'!='' '$(GitBaseVersionLabel)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+            Command="git rev-parse v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch) --">
             <Output TaskParameter="ConsoleOutput" PropertyName="GitReleaseTagParseResult"/>
+            <Output TaskParameter="ExitCode" PropertyName="GitReleaseTagParseExitCode"/>
         </Exec>
 
         <!-- if the tag exists, bump the version number -->
-        <PropertyGroup Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!='' And '$(GitReleaseTagParseResult)'!=''">
+        <PropertyGroup Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!='' And '$(GitReleaseTagParseExitCode)'=='0'">
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
         </PropertyGroup>
         
