@@ -118,7 +118,7 @@
     </Target>
 
     <!-- determine versioning scheme from tag and environment and apply it -->
-    <Target Name="ApplyGitInfo" DependsOnTargets="CheckIfGitIsDirty;PickGitBaseTag;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;CoreCompile;Pack">
+    <Target Name="ApplyGitInfo" DependsOnTargets="CheckIfGitIsDirty;PickGitBaseTag;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;Build;CoreCompile;Publish;Pack">
 
         <!-- create  hashes to help identify what machine built the artifact -->
         <ItemGroup>
