@@ -66,6 +66,12 @@
             <Output TaskParameter="ConsoleOutput" PropertyName="GitBaseTag"/>
         </Exec>
 
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              Command="git describe --exact-match --tags HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeHead"/>
+        </Exec>
+
+
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="Picked Tag: $(GitBaseTag)" />
 
@@ -77,8 +83,6 @@
             <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
             <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
 
-            <!-- only increment the patch if there is not a label on the tag, it is either a hotfix or a prerelease -->
-            <GitSemVerPatch Condition="'$(GitBaseVersionLabel)'==''">$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
         </PropertyGroup>
 
         <!-- check if the tag is a prerelease by looking for an existing tag -->
@@ -88,16 +92,16 @@
             <Output TaskParameter="ExitCode" PropertyName="GitReleaseTagParseExitCode"/>
         </Exec>
 
-        <!-- if the tag exists, bump the version number -->
-        <PropertyGroup Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!='' And '$(GitReleaseTagParseExitCode)'=='0'">
+        <!--
+          - if we're an exact match or the base tag doesn't exist,
+          - it's a release candidate, keep the patch number,
+          - otherwise it's a prerelease, bump the patch number
+          -->
+        <PropertyGroup>
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
+            <GitSemVerPatch Condition="'$(GitDescribeHead)'=='$(GitBaseTag)' Or '$(GitReleaseTagParseExitCode)'!='0'">$(GitBaseVersionPatch)</GitSemVerPatch>
         </PropertyGroup>
 
-        <!-- if the tag doesn't exist, keep the version number -->
-        <PropertyGroup Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!='' And '$(GitReleaseTagParseExitCode)'!='0'">
-            <GitSemVerPatch>$(GitBaseVersionPatch)</GitSemVerPatch>
-        </PropertyGroup>
-        
         <!-- we did not pick a tag, set defaults -->
         <PropertyGroup Condition="'$(GitBaseTag)'==''">
             <GitSemVerSource>Default</GitSemVerSource>
