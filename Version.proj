@@ -36,6 +36,20 @@
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All"/>
     </ItemGroup>
 
+    <Target Name="GitFetchTags">
+        <!-- first check if the repo is shallow -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true"
+              Command="git rev-parse --is-shallow-repository">
+            <Output TaskParameter="ExitCode" PropertyName="GitIsShallow"/>
+        </Exec>
+
+        <!-- if the repo is shallow, we need to fetch tags -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true" Condition="'$(GitIsShallow)'!='false'"
+              Command="git fetch --force --update-shallow --depth 1 origin 'refs/tags/*:refs/tags/*'" />
+
+        <!-- otherwise assume the tags are up to date for now -->
+    </Target>
+
     <Target Name="CheckIfGitIsDirty">
         <!-- refresh the index -->
         <Exec ContinueOnError="true" IgnoreExitCode="true"
@@ -51,7 +65,7 @@
         <Message Importance="$(VersionNetDebugImportance)" Text="Git Is Dirty: $(GitIsDirty)" />
     </Target>
 
-    <Target Name="PickGitBaseTag" DependsOnTargets="CheckIfGitIsDirty">
+    <Target Name="PickGitBaseTag" DependsOnTargets="GitFetchTags;CheckIfGitIsDirty">
         <!-- windows has a thing about percent signs being for environment variable expansion -->
         <PropertyGroup>
             <EscPct>%</EscPct>
