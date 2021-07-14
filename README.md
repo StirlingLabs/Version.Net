@@ -13,6 +13,16 @@ It uses [SourceLink](https://github.com/dotnet/sourcelink/) and [GitInfo](https:
 
 ## How do I use it?
 
+Note that when checking out a project that includes StirlingLabs.Version, you will need to get submodules;
+
+```sh
+# if the submodule isn't present in your clone
+> git submodule update --init --recursive
+# subsequently, when pulling from master also get submodules
+> git pull --recurse-submodules
+```
+
+
 To create a new version, just create a new tag in "vYY.M.update" format.  This can be done automatically for you;
 
 ```sh
@@ -114,4 +124,14 @@ For example, after editing, the *StirlingLabsExampleProject.csproj* file might l
         <Import Project="../Version.proj"/>
     </ImportGroup>
 </Project>
+```
+
+### Update GitHub Actions
+
+Note that CI will need to be updated to check out submodules.  In GitHub Actions, this means updating the checkout step:
+
+```yaml
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
 ```
