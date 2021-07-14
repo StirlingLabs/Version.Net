@@ -47,7 +47,7 @@ That's ok, you can just tell it to just use one of your projects in the solution
 or you can do it manually if you need the control;
 
 ```sh
-> git tag -a v21.7.0 -m "My first version in July 2021"
+> git tag -a v21.07.0 -m "My first version in July 2021"
 ```
 
 ...but please come up with a better message than that!
@@ -55,7 +55,7 @@ or you can do it manually if you need the control;
 By default, the git push command doesn’t transfer tags to GitHub, so you will have to explicitly push tags after you have created them. This is just like sharing branches, we would push the tag we created above with;
 
 ```sh
-> git push origin v21.7.0
+> git push origin v21.07.0
 ```
 
 ## How do I install it?
