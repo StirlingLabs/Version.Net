@@ -74,9 +74,9 @@
             <EscPct>%%</EscPct>
         </PropertyGroup>
 
-        <!-- reverse-sort tags by descending v:refname and pick the top, should be latest semver -->
+        <!-- reverse-sort tags by descending taggerdate and pick the top, should be latest semver -->
         <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-              Command="git for-each-ref &quot;refs/tags/v[1-9]*&quot; --count=1 --sort=-v:refname &quot;--format=$(EscPct)(refname:short)&quot;">
+              Command="git for-each-ref &quot;refs/tags/v[1-9]*&quot; --count=1 --sort=-taggerdate &quot;--format=$(EscPct)(refname:short)&quot;">
             <Output TaskParameter="ConsoleOutput" PropertyName="GitBaseTag"/>
         </Exec>
 
