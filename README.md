@@ -1,9 +1,9 @@
-# Version.Net
+# StirlingLabs/Version.Net
 
-**StirlingLabs/Version.Net** is an MsBuild package providing versioning configuration for our .NET projects.
+**StirlingLabs.Version** is an MsBuild package providing versioning configuration for our .NET projects.
 
 <sub>[Like a Version](https://www.abc.net.au/triplej/like-a-version/) is a weekly live music segment on [Triple J](https://www.abc.net.au/triplej/) where musicians play one of their own songs plus a cover.</sub>
-![Like a Version](./like-a-version.jpeg)
+![Like a Version.Net](./like-a-version-dotnet.png)
 
 ## What does it do?
 
@@ -13,6 +13,16 @@ It uses [SourceLink](https://github.com/dotnet/sourcelink/) and [GitInfo](https:
 
 ## How do I use it?
 
+Note that when checking out a project that includes StirlingLabs.Version, you will need to get submodules;
+
+```sh
+# if the submodule isn't present in your clone
+> git submodule update --init --recursive
+# subsequently, when pulling from master also get submodules
+> git pull --recurse-submodules
+```
+
+
 To create a new version, just create a new tag in "vYY.M.update" format.  This can be done automatically for you;
 
 ```sh
@@ -20,12 +30,12 @@ To create a new version, just create a new tag in "vYY.M.update" format.  This c
 ```
 
 If you have a solution with more than one project, you will get an error;
+
 ```
 Microsoft (R) Build Engine version 16.9.0+57a23d249 for .NET
 Copyright (C) Microsoft Corporation. All rights reserved.
 
 MSBUILD : error MSB1011: Specify which project or solution file to use because this folder contains more than one project or solution file.
-
 ```
 
 That's ok, you can just tell it to just use one of your projects in the solution.
@@ -114,4 +124,14 @@ For example, after editing, the *StirlingLabsExampleProject.csproj* file might l
         <Import Project="../Version.proj"/>
     </ImportGroup>
 </Project>
+```
+
+### Update GitHub Actions
+
+Note that CI will need to be updated to check out submodules.  In GitHub Actions, this means updating the checkout step:
+
+```yaml
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
 ```
