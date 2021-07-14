@@ -82,7 +82,6 @@
             <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
             <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
             <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
-
         </PropertyGroup>
 
         <!-- check if the tag is a prerelease by looking for an existing tag -->
@@ -97,7 +96,7 @@
           - it's a release candidate, keep the patch number,
           - otherwise it's a prerelease, bump the patch number
           -->
-        <PropertyGroup>
+        <PropertyGroup Condition="'$(GitBaseTag)'!=''">
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
             <GitSemVerPatch Condition="'$(GitDescribeHead)'=='$(GitBaseTag)' Or '$(GitReleaseTagParseExitCode)'!='0'">$(GitBaseVersionPatch)</GitSemVerPatch>
         </PropertyGroup>
