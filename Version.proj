@@ -10,6 +10,7 @@
     <PropertyGroup>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EnableSourceLink Condition="'$(RepositoryUrl)'!=''">true</EnableSourceLink>
+        <ContinuousIntegrationBuild Condition="'$(ContinuousIntegrationBuild)'==''">false</ContinuousIntegrationBuild>
         <ContinuousIntegrationBuild Condition="'$(CI)'!=''">true</ContinuousIntegrationBuild>
         <DeterministicSourcePaths Condition="'$(ContinuousIntegrationBuild)'!=''">$(ContinuousIntegrationBuild)</DeterministicSourcePaths>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -39,12 +40,14 @@
     <Target Name="GitFetchTags">
         <!-- first check if the repo is shallow -->
         <Exec ContinueOnError="true" IgnoreExitCode="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
               Command="git rev-parse --is-shallow-repository">
             <Output TaskParameter="ExitCode" PropertyName="GitIsShallow"/>
         </Exec>
 
         <!-- if the repo is shallow, we need to fetch tags -->
         <Exec ContinueOnError="true" IgnoreExitCode="true" Condition="'$(GitIsShallow)'!='false'"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
               Command="git fetch --force --update-shallow --depth 1 origin 'refs/tags/*:refs/tags/*'" />
 
         <!-- otherwise assume the tags are up to date for now -->
@@ -53,16 +56,23 @@
     <Target Name="CheckIfGitIsDirty">
         <!-- refresh the index -->
         <Exec ContinueOnError="true" IgnoreExitCode="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
               Command="git update-index --refresh" />
 
         <!-- determine if there are any uncommitted changes -->
         <Exec ContinueOnError="true" IgnoreExitCode="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
               Command="git diff-index --quiet HEAD --">
             <Output TaskParameter="ExitCode" PropertyName="GitIsDirty"/>
         </Exec>
 
+        <PropertyGroup>
+            <GitIsDirty Condition="'$(GitIsDirty)'=='1'">true</GitIsDirty>
+            <GitIsDirty Condition="'$(GitIsDirty)'=='0'">false</GitIsDirty>
+        </PropertyGroup>
+        
         <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="Git Is Dirty: $(GitIsDirty)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitIsDirty: $(GitIsDirty)" />
     </Target>
 
     <Target Name="PickGitBaseTag" DependsOnTargets="GitFetchTags;CheckIfGitIsDirty">
@@ -74,56 +84,84 @@
             <EscPct>%%</EscPct>
         </PropertyGroup>
 
-        <!-- reverse-sort tags by descending committerdate and pick the top, should be latest semver -->
         <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-              Command="git for-each-ref &quot;refs/tags/v[1-9]*&quot; --count=1 --sort=-committerdate &quot;--format=$(EscPct)(refname:short)&quot;">
-            <Output TaskParameter="ConsoleOutput" PropertyName="GitBaseTag"/>
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              Command="git describe --tags --match=v[1-9]* HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTag"/>
         </Exec>
 
-        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-              Command="git describe --exact-match --tags HEAD">
-            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeHead"/>
-        </Exec>
-
-
-        <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="Picked Tag: $(GitBaseTag)" />
-
-        <!-- we picked a tag, extract components -->
-        <PropertyGroup Condition="'$(GitBaseTag)'!=''">
-            <GitSemVerSource>Tag</GitSemVerSource>
-            <GitBaseVersionMajor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MAJOR'].Value)</GitBaseVersionMajor>
-            <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
-            <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
-            <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitBaseTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
+        <!-- constrain results of git describe -->
+        <PropertyGroup>
+            <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.]+\.[^\.]+.[^\-]+(?:-[^\-]+)?').Value)</GitDescribeTag>
         </PropertyGroup>
 
-        <!-- check if the tag is a prerelease by looking for an existing tag -->
-        <Exec Condition="'$(GitBaseTag)'!='' And '$(GitBaseVersionLabel)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
-            Command="git rev-parse v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch) --">
-            <Output TaskParameter="ConsoleOutput" PropertyName="GitReleaseTagParseResult"/>
-            <Output TaskParameter="ExitCode" PropertyName="GitReleaseTagParseExitCode"/>
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag)" />
+
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              Command="git describe --tags --match=v[1-9]* --exact-match HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeMatch"/>
         </Exec>
 
-        <!--
-          - if we're an exact match or the base tag doesn't exist,
-          - it's a release candidate, keep the patch number,
-          - otherwise it's a prerelease, bump the patch number
-          -->
-        <PropertyGroup Condition="'$(GitBaseTag)'!=''">
-            <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
-            <GitSemVerPatch Condition="'$(GitDescribeHead)'=='$(GitBaseTag)' Or '$(GitReleaseTagParseExitCode)'!='0'">$(GitBaseVersionPatch)</GitSemVerPatch>
+        <!-- constrain results of git describe -->
+        <PropertyGroup>
+            <GitDescribeMatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeMatch), '^v.+').Value)</GitDescribeMatch>
+        </PropertyGroup>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch)" />
+
+        <!-- we picked a tag, extract components -->
+        <PropertyGroup Condition="'$(GitDescribeTag)'!=''">
+            <GitSemVerSource>Tag</GitSemVerSource>
+            <GitBaseVersionMajor>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['MAJOR'].Value)</GitBaseVersionMajor>
+            <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
+            <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
+            <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
         </PropertyGroup>
 
         <!-- we did not pick a tag, set defaults -->
-        <PropertyGroup Condition="'$(GitBaseTag)'==''">
+        <PropertyGroup Condition="'$(GitDescribeTag)'==''">
             <GitSemVerSource>Default</GitSemVerSource>
             <GitBaseVersionMajor>$([System.DateTime]::Now.ToString(`yy`))</GitBaseVersionMajor>
             <GitBaseVersionMinor>$([System.DateTime]::Now.ToString(`MM`))</GitBaseVersionMinor>
             <GitBaseVersionPatch>0</GitBaseVersionPatch>
             <GitSemVerPatch>0</GitSemVerPatch>
         </PropertyGroup>
-        
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitBaseVersionMajor: $(GitBaseVersionMajor)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitBaseVersionMinor: $(GitBaseVersionMinor)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitBaseVersionPatch: $(GitBaseVersionPatch)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitBaseVersionLabel: $(GitBaseVersionLabel)" />
+
+        <!-- check if the tag is a prerelease by looking for an existing tag -->
+        <Exec Condition="'$(GitBaseVersionLabel)'!=''" ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              Command="git rev-parse -q --verify v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch) --">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitReleaseTagParseResult"/>
+            <Output TaskParameter="ExitCode" PropertyName="GitReleaseTagParseExitCode"/>
+        </Exec>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitReleaseTagParseResult: $(GitReleaseTagParseResult)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitReleaseTagParseExitCode: $(GitReleaseTagParseExitCode)" />
+
+        <!-- if we're a pre-release, bump the patch and prefix the label -->
+        <PropertyGroup Condition="'$(GitDescribeTag)'!='' And '$(GitDescribeMatch)'!='$(GitDescribeTag)'">
+            <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
+            <GitSemVerLabel>pre-$(GitBaseVersionLabel)</GitSemVerLabel>
+        </PropertyGroup>
+        <!-- otherwise assume we're not a pre-release -->
+        <PropertyGroup Condition="'$(GitDescribeTag)'!='' And '$(GitDescribeMatch)'=='$(GitDescribeTag)'">
+            <GitSemVerPatch>$(GitBaseVersionPatch)</GitSemVerPatch>
+            <GitSemVerLabel>$(GitBaseVersionLabel)</GitSemVerLabel>
+            <GitSemVerPatch Condition="$(GitIsDirty)">$([MsBuild]::Add($(GitSemVerPatch),1))</GitSemVerPatch>
+            <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">pre$(GitBaseVersionLabel)</GitSemVerLabel>
+            <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' != ''">pre-$(GitBaseVersionLabel)</GitSemVerLabel>
+        </PropertyGroup>
+
         <!-- the major and minor recommended versions will always be from the current date -->
         <PropertyGroup>
             <GitSemVerMajor>$([System.DateTime]::Now.ToString(`yy`))</GitSemVerMajor>
@@ -131,7 +169,9 @@
         </PropertyGroup>
 
         <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="Parsed Tag: $(GitBaseVersionMajor) $(GitBaseVersionMinor) $(GitBaseVersionPatch)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="Base Tag: v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="Deduced Version: v$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)" Condition="'$(GitSemVerLabel)'==''" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="Deduced Version: v$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)-$(GitSemVerLabel)" Condition="'$(GitSemVerLabel)'!=''" />
     </Target>
 
     <!-- determine versioning scheme from tag and environment and apply it -->
@@ -177,19 +217,22 @@
         <!-- ultimately determine the version from the status of git -->
         <PropertyGroup>
             <!-- ci builds may mess with the working tree, pretend it's not dirty -->
-            <GitIsDirty Condition="'$(GitIsDirty)'!='0' And '$(ContinuousIntegrationBuild)'=='true'">0</GitIsDirty>
+            <GitIsDirty Condition="!$(GitIsDirty) And $(ContinuousIntegrationBuild)">false</GitIsDirty>
             
             <!-- build the version suffix accordingly -->
-            <VersionSuffix Condition="'$(GitIsDirty)'!='0' And '$(VersionSuffix)'==''">-pre-$(Timestamp)</VersionSuffix>
-            <VersionSuffix Condition="'$(GitIsDirty)'!='0'">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,3))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
+            <VersionSuffix Condition="$(GitIsDirty) And '$(VersionSuffix)'=='' And '$(GitSemVerLabel)'!=''">-$(GitSemVerLabel)-$(Timestamp)</VersionSuffix>
+            <VersionSuffix Condition="$(GitIsDirty) And '$(VersionSuffix)'=='' And '$(GitSemVerLabel)'==''">-pre-$(Timestamp)</VersionSuffix>
+            <VersionSuffix Condition="$(GitIsDirty)">$(VersionSuffix)+$(MachineUniqueHash.Substring(0,3))/$(UserUniqueHash.Substring(0,3))</VersionSuffix>
+            
+            <!-- clear erroneous 'v1.0.0' version prefix if set -->
             <VersionPrefix Condition="'$(VersionPrefix)'=='1.0.0'"/>
 
             <!-- the version suffix should include the label from the tag if not dirty -->
-            <VersionSuffix Condition="'$(GitIsDirty)'=='0' And '$(GitBaseVersionLabel)'!=''">-$(GitBaseVersionLabel)$(VersionSuffix)</VersionSuffix>
+            <VersionSuffix Condition="'$(GitIsDirty)'=='0' And '$(GitSemVerLabel)'!=''">-$(GitSemVerLabel)$(VersionSuffix)</VersionSuffix>
 
             <!-- build the full semver 2.0 string
              - CI build or non-dirty: year.month.update+commit
-             - non-CI dirty: year.month.update-pre-timestamp+machine+user.commit
+             - non-CI dirty: year.month.update-pre-label-timestamp+machine+user.commit
              - note: sourcelink will append the commit hash as well as embed it in the assembly
              -->
             <Version>$(VersionPrefix)$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)$(VersionSuffix)</Version>
@@ -207,9 +250,6 @@
             <FileVersion>$(AssemblyVersion).0</FileVersion>
         </PropertyGroup>
 
-        <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="Minimum Version: $(GitBaseVersionMajor).$(GitBaseVersionMinor).0"/>
-
         <!-- report version information to user -->
         <Message Importance="$(VersionNetInfoImportance)" Text="Version: $(Version)"/>
         <Message Importance="$(VersionNetInfoImportance)" Text="Commit: $(SourceRevisionId)"/>
@@ -226,7 +266,8 @@
         <Message Importance="$(VersionNetDebugImportance)" Text="Checking Tag: $(NewTag)"/>
 
         <!-- have git create a tag for this version -->
-        <Exec Command="git tag $(NewTag)" ContinueOnError="true" IgnoreExitCode="true">
+        <Exec Command="git tag $(NewTag)" ContinueOnError="true" IgnoreExitCode="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true">
             <Output TaskParameter="ExitCode" PropertyName="GitCreateTagExitCode"/>
         </Exec>
 
