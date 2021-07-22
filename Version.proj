@@ -29,7 +29,7 @@
         <VersionNetInfoImportance>high</VersionNetInfoImportance>
 
         <!-- set this to high for debugging output -->
-        <VersionNetDebugImportance>high</VersionNetDebugImportance>
+        <VersionNetDebugImportance>low</VersionNetDebugImportance>
     </PropertyGroup>
 
     <!-- support for sourcelink to github -->
