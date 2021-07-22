@@ -45,12 +45,14 @@
             <Output TaskParameter="ExitCode" PropertyName="GitIsShallow"/>
         </Exec>
 
-        <!-- if the repo is shallow, we need to fetch tags -->
+        <!-- unshallow the repo -->
         <Exec ContinueOnError="true" IgnoreExitCode="true" Condition="'$(GitIsShallow)'!='false'"
               StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
-              Command="git fetch --force --update-shallow --depth 1 origin 'refs/tags/*:refs/tags/*'" />
+              Command="git fetch --unshallow" />
 
-        <!-- otherwise assume the tags are up to date for now -->
+        <PropertyGroup>
+            <GitIsShallow>false</GitIsShallow>
+        </PropertyGroup>
     </Target>
 
     <Target Name="CheckIfGitIsDirty">
