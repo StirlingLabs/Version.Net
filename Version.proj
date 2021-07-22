@@ -29,7 +29,7 @@
         <VersionNetInfoImportance>high</VersionNetInfoImportance>
 
         <!-- set this to high for debugging output -->
-        <VersionNetDebugImportance>low</VersionNetDebugImportance>
+        <VersionNetDebugImportance>high</VersionNetDebugImportance>
     </PropertyGroup>
 
     <!-- support for sourcelink to github -->
@@ -90,13 +90,16 @@
             <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTag"/>
         </Exec>
 
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag)" />
+
         <!-- constrain results of git describe -->
         <PropertyGroup>
             <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.]+\.[^\.]+.[^\-]+(?:-[^\-]+)?').Value)</GitDescribeTag>
         </PropertyGroup>
 
         <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag) (after constraint)" />
 
         <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
               StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
@@ -104,13 +107,16 @@
             <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeMatch"/>
         </Exec>
 
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch)" />
+
         <!-- constrain results of git describe -->
         <PropertyGroup>
             <GitDescribeMatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeMatch), '^v.+').Value)</GitDescribeMatch>
         </PropertyGroup>
 
         <!-- debugging output -->
-        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch)" />
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch) (after constraint)" />
 
         <!-- we picked a tag, extract components -->
         <PropertyGroup Condition="'$(GitDescribeTag)'!=''">
