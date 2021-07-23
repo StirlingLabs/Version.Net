@@ -97,7 +97,7 @@
 
         <!-- constrain results of git describe -->
         <PropertyGroup>
-            <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.]+\.[^\.]+.[^\-]+(?:-[^\-]+)?').Value)</GitDescribeTag>
+            <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.\-]+\.(?:[^\.\-]+\.)?(?:[^\.\-]+)?(?:-[^\.\-]+)?').Value)</GitDescribeTag>
         </PropertyGroup>
 
         <!-- debugging output -->
@@ -120,6 +120,7 @@
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch) (after constraint)" />
 
+        
         <!-- we picked a tag, extract components -->
         <PropertyGroup Condition="'$(GitDescribeTag)'!=''">
             <GitSemVerSource>Tag</GitSemVerSource>
@@ -127,9 +128,14 @@
             <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
             <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
             <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
+
+            <!-- fallbacks for partial semver -->
+            <GitBaseVersionMajor Condition="'$(GitBaseVersionMajor)'==''">0</GitBaseVersionMajor>
+            <GitBaseVersionMinor Condition="'$(GitBaseVersionMinor)'==''">0</GitBaseVersionMinor>
+            <GitBaseVersionPatch Condition="'$(GitBaseVersionPatch)'==''">0</GitBaseVersionPatch>
         </PropertyGroup>
 
-        <!-- we did not pick a tag, set defaults -->
+        <!-- we did not pick a tag, force defaults -->
         <PropertyGroup Condition="'$(GitDescribeTag)'==''">
             <GitSemVerSource>Default</GitSemVerSource>
             <GitBaseVersionMajor>$([System.DateTime]::Now.ToString(`yy`))</GitBaseVersionMajor>
@@ -165,7 +171,7 @@
         <PropertyGroup Condition="'$(GitDescribeTag)'!='' And '$(GitDescribeMatch)'=='$(GitDescribeTag)'">
             <GitSemVerPatch>$(GitBaseVersionPatch)</GitSemVerPatch>
             <GitSemVerLabel>$(GitBaseVersionLabel)</GitSemVerLabel>
-            <GitSemVerPatch Condition="$(GitIsDirty)">$([MsBuild]::Add($(GitSemVerPatch),1))</GitSemVerPatch>
+            <GitSemVerPatch Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">$([MsBuild]::Add($(GitSemVerPatch),1))</GitSemVerPatch>
             <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">pre$(GitBaseVersionLabel)</GitSemVerLabel>
             <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' != ''">pre-$(GitBaseVersionLabel)</GitSemVerLabel>
         </PropertyGroup>
