@@ -182,6 +182,10 @@
             <GitSemVerMinor>$([System.DateTime]::Now.ToString(`MM`))</GitSemVerMinor>
         </PropertyGroup>
 
+        <PropertyGroup Condition="'$(GitSemVerMajor)'!='$(GitBaseVersionMajor)' Or '$(GitSemVerMinor)'!='$(GitBaseVersionMinor)'">
+            <GitSemVerPatch>0</GitSemVerPatch>
+        </PropertyGroup>
+
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="Base Tag: v$(GitBaseVersionMajor).$(GitBaseVersionMinor).$(GitBaseVersionPatch)" />
         <Message Importance="$(VersionNetDebugImportance)" Text="Deduced Version: v$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)" Condition="'$(GitSemVerLabel)'==''" />
