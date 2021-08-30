@@ -26,10 +26,10 @@
         <SemVerRegex>v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)(?:\-(?&lt;LABEL&gt;[\dA-Za-z\-\.]+))?$|^v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)\.(?&lt;PATCH&gt;\d+)(?:\-(?&lt;LABEL&gt;[\dA-Za-z\-\.]+))?$|^(?&lt;LABEL&gt;[\dA-Za-z\-\.]+)\-v?(?&lt;MAJOR&gt;\d+)\.(?&lt;MINOR&gt;\d+)\.(?&lt;PATCH&gt;\d+)$</SemVerRegex>
 
         <!-- reports things like the resulting version string -->
-        <VersionNetInfoImportance>high</VersionNetInfoImportance>
+        <VersionNetInfoImportance Condition="'$(VersionNetInfoImportance)'==''">high</VersionNetInfoImportance>
 
         <!-- set this to high for debugging output -->
-        <VersionNetDebugImportance>low</VersionNetDebugImportance>
+        <VersionNetDebugImportance Condition="'$(VersionNetDebugImportance)'==''">low</VersionNetDebugImportance>
     </PropertyGroup>
 
     <!-- support for sourcelink to github -->
@@ -69,7 +69,7 @@
         </Exec>
 
         <PropertyGroup>
-            <GitIsDirty Condition="'$(GitIsDirty)'=='1'">true</GitIsDirty>
+            <GitIsDirty Condition="'$(GitIsDirty)'!='0'">true</GitIsDirty>
             <GitIsDirty Condition="'$(GitIsDirty)'=='0'">false</GitIsDirty>
         </PropertyGroup>
         
@@ -85,9 +85,21 @@
         <PropertyGroup Condition="$(OS.StartsWith('Windows'))">
             <EscPct>%%</EscPct>
         </PropertyGroup>
+        
+        <!-- get the current commit -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildProjectDirectory)"
+              Command="git rev-parse HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitHead"/>
+        </Exec>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Text="GitHead: $(GitHead)" />
 
         <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
               StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildProjectDirectory)"
               Command="git describe --tags --match=v[1-9]* HEAD">
             <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTag"/>
         </Exec>
@@ -96,16 +108,60 @@
         <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag)" />
 
         <!-- constrain results of git describe -->
-        <PropertyGroup>
+        <PropertyGroup Condition="'$(GitDescribeTag)' != ''">
             <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.\-]+\.(?:[^\.\-]+\.)?(?:[^\.\-]+)?(?:-[^\.\-]+)?').Value)</GitDescribeTag>
         </PropertyGroup>
 
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeTag: $(GitDescribeTag) (after constraint)" />
 
+        <PropertyGroup>
+            <GitDescribeFailed Condition="'$(GitDescribeTag)' == ''">true</GitDescribeFailed>
+            <GitDescribeFailed Condition="'$(GitDescribeTag)' != ''">false</GitDescribeFailed>
+        </PropertyGroup>
+        
+        <!-- fallback to using git for-each-ref to pick the newest tag -->
         <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
               StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildThisFileDirectory).." Condition="$(GitDescribeFailed)"
+              Command="git for-each-ref &quot;refs/tags/v[1-9]*&quot; --count=1 --sort=-committerdate &quot;--format=$(EscPct)(refname:short)&quot;">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTag"/>
+        </Exec>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Condition="$(GitDescribeFailed)"
+                 Text="GitDescribeTag Fallback: $(GitDescribeTag)" />
+
+        <!-- constrain results of git describe, possibly for a second time -->
+        <PropertyGroup Condition="$(GitDescribeFailed)">
+            <GitDescribeTag>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), '^v[^\.\-]+\.(?:[^\.\-]+\.)?(?:[^\.\-]+)?(?:-[^\.\-]+)?').Value)</GitDescribeTag>
+        </PropertyGroup>
+
+
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildThisFileDirectory).." Condition="$(GitDescribeFailed) And '$(GitDescribeTag)' != ''"
+              Command="git rev-list --count $(GitDescribeTag)..HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTagLabel"/>
+        </Exec>
+
+        <!-- debugging output -->
+        <Message Importance="$(VersionNetDebugImportance)" Condition="$(GitDescribeFailed)"
+                 Text="GitDescribeTag Fallback: $(GitDescribeTag) (after constraint)" />
+        
+        <!-- use git describe to check for an exactly matching tag -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildProjectDirectory)" Condition="!$(GitDescribeFailed)"
               Command="git describe --tags --match=v[1-9]* --exact-match HEAD">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeMatch"/>
+        </Exec>
+
+        <!-- fallback for when git describe fails -->
+        <Exec ContinueOnError="true" IgnoreExitCode="true" ConsoleToMsBuild="true"
+              StandardErrorImportance="low" StandardOutputImportance="low" EchoOff="true"
+              WorkingDirectory="$(MSBuildProjectDirectory)" Condition="$(GitDescribeFailed)"
+              Command="git name-rev --tags --name-only $(GitHead)">
             <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeMatch"/>
         </Exec>
 
@@ -116,10 +172,9 @@
         <PropertyGroup>
             <GitDescribeMatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeMatch), '^v.+').Value)</GitDescribeMatch>
         </PropertyGroup>
-
+        
         <!-- debugging output -->
         <Message Importance="$(VersionNetDebugImportance)" Text="GitDescribeMatch: $(GitDescribeMatch) (after constraint)" />
-
         
         <!-- we picked a tag, extract components -->
         <PropertyGroup Condition="'$(GitDescribeTag)'!=''">
@@ -128,6 +183,7 @@
             <GitBaseVersionMinor>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['MINOR'].Value)</GitBaseVersionMinor>
             <GitBaseVersionPatch>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['PATCH'].Value)</GitBaseVersionPatch>
             <GitBaseVersionLabel>$([System.Text.RegularExpressions.Regex]::Match($(GitDescribeTag), $(SemVerRegex)).Groups['LABEL'].Value)</GitBaseVersionLabel>
+            <GitBaseVersionLabel Condition="$(GitDescribeFailed) And '$(GitBaseVersionLabel)'==''">$(GitDescribeTagLabel)</GitBaseVersionLabel>
 
             <!-- fallbacks for partial semver -->
             <GitBaseVersionMajor Condition="'$(GitBaseVersionMajor)'==''">0</GitBaseVersionMajor>
@@ -165,14 +221,15 @@
         <!-- if we're a pre-release, bump the patch and prefix the label -->
         <PropertyGroup Condition="'$(GitDescribeTag)'!='' And '$(GitDescribeMatch)'!='$(GitDescribeTag)'">
             <GitSemVerPatch>$([MsBuild]::Add($(GitBaseVersionPatch),1))</GitSemVerPatch>
-            <GitSemVerLabel>pre-$(GitBaseVersionLabel)</GitSemVerLabel>
+            <GitSemVerLabel Condition="'$(GitBaseVersionLabel)'!=''">pre-$(GitBaseVersionLabel)</GitSemVerLabel>
+            <GitSemVerLabel Condition="'$(GitBaseVersionLabel)'==''">pre</GitSemVerLabel>
         </PropertyGroup>
         <!-- otherwise assume we're not a pre-release -->
         <PropertyGroup Condition="'$(GitDescribeTag)'!='' And '$(GitDescribeMatch)'=='$(GitDescribeTag)'">
             <GitSemVerPatch>$(GitBaseVersionPatch)</GitSemVerPatch>
             <GitSemVerLabel>$(GitBaseVersionLabel)</GitSemVerLabel>
             <GitSemVerPatch Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">$([MsBuild]::Add($(GitSemVerPatch),1))</GitSemVerPatch>
-            <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">pre$(GitBaseVersionLabel)</GitSemVerLabel>
+            <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' == ''">pre</GitSemVerLabel>
             <GitSemVerLabel Condition="$(GitIsDirty) And '$(GitBaseVersionLabel)' != ''">pre-$(GitBaseVersionLabel)</GitSemVerLabel>
         </PropertyGroup>
 
@@ -271,6 +328,16 @@
         <!-- report version information to user -->
         <Message Importance="$(VersionNetInfoImportance)" Text="Version: $(Version)"/>
         <Message Importance="$(VersionNetInfoImportance)" Text="Commit: $(SourceRevisionId)"/>
+    </Target>
+    
+    <Target Name="FixDependentProjectVersion" BeforeTargets="_GetProjectVersion">
+        <ItemGroup>
+            <_ProjectPathWithVersion Update="$(MSBuildStartupDirectory)/**/*.csproj">
+                <ProjectVersion Condition="'$(PackageVersion)' == ''">$(Version)</ProjectVersion>
+            </_ProjectPathWithVersion>
+        </ItemGroup>
+        <!-- debugging output -->
+        <Message Importance="high" Text="FixDependentProjectVersion: @(_ProjectPathWithVersion)"/>
     </Target>
 
     <!-- user invoked creation of a tag in git -->
