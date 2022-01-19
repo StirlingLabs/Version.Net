@@ -2,8 +2,8 @@
 <Project>
     <!-- add package references to all including projects -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Build.Tasks.Git" Version="1.0.0" PrivateAssets="All"/>
-        <PackageReference Include="Microsoft.SourceLink.Common" Version="1.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.Build.Tasks.Git" Version="1.1.1" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.SourceLink.Common" Version="1.1.1" PrivateAssets="All"/>
     </ItemGroup>
 
     <!-- configuration for sourcelink and gitinfo -->
@@ -34,7 +34,7 @@
 
     <!-- support for sourcelink to github -->
     <ItemGroup Condition="$(RepositoryUrl.StartsWith('https://github.com/'))">
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All"/>
     </ItemGroup>
 
     <Target Name="GitFetchTags">
