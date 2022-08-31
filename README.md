@@ -96,7 +96,7 @@ Content of *Version.proj*:
         <GitCommitsIgnoreMerges>true</GitCommitsIgnoreMerges>
     </PropertyGroup>
     <ImportGroup>
-        <Import Project="StirlingLabs.Version/Version.proj" />
+        <Import Project="Version.Net/Version.proj" />
     </ImportGroup>
 </Project>
 ```
