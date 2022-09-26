@@ -337,7 +337,7 @@
             </_ProjectPathWithVersion>
         </ItemGroup>
         <!-- debugging output -->
-        <Message Importance="high" Text="FixDependentProjectVersion: @(_ProjectPathWithVersion)"/>
+        <Message Importance="$(VersionNetInfoImportance)" Text="FixDependentProjectVersion: @(_ProjectPathWithVersion)"/>
     </Target>
 
     <!-- user invoked creation of a tag in git -->
@@ -357,6 +357,22 @@
         </Exec>
 
         <!-- report to user tag was created if successful -->
-        <Message Importance="high" Text="Created Tag: $(NewTag)" Condition="'$(GitCreateTagExitCode)'=='0'"/>
+        <Message Importance="$(VersionNetInfoImportance)" Text="Created Tag: $(NewTag)" Condition="'$(GitCreateTagExitCode)'=='0'"/>
     </Target>
+
+    <!-- add versioning capability to ProjectReference items -->
+    <Target Name="UseExplicitPackageVersions" BeforeTargets="GenerateNuspec">
+    <ItemGroup>
+      <_ProjectReferenceWithExplicitPackageVersion Include="@(ProjectReference->'%(FullPath)')" Condition="'%(ProjectReference.PackageVersion)' != ''" />
+      <_ProjectReferenceWithExactPackageVersion Include="@(ProjectReference->'%(FullPath)')" Condition="'%(ProjectReference.ExactVersion)' == 'true'" />
+      <_ProjectReferenceWithReassignedVersion Include="@(_ProjectReferencesWithVersions)" Condition="'%(Identity)' != '' And '@(_ProjectReferenceWithExplicitPackageVersion)' == '@(_ProjectReferencesWithVersions)'">
+        <ProjectVersion>@(_ProjectReferenceWithExplicitPackageVersion->'%(PackageVersion)')</ProjectVersion>
+      </_ProjectReferenceWithReassignedVersion>
+      <_ProjectReferenceWithReassignedVersion Include="@(_ProjectReferencesWithVersions)" Condition="'%(Identity)' != '' And '@(_ProjectReferenceWithExactPackageVersion)' == '@(_ProjectReferencesWithVersions)'">
+        <ProjectVersion>[@(_ProjectReferencesWithVersions->'%(ProjectVersion)')]</ProjectVersion>
+      </_ProjectReferenceWithReassignedVersion>
+      <_ProjectReferencesWithVersions Remove="@(_ProjectReferenceWithReassignedVersion)" />
+      <_ProjectReferencesWithVersions Include="@(_ProjectReferenceWithReassignedVersion)" />
+    </ItemGroup>
+  </Target>
 </Project>
