@@ -250,7 +250,7 @@
     </Target>
 
     <!-- determine versioning scheme from tag and environment and apply it -->
-    <Target Name="ApplyGitInfo" DependsOnTargets="CheckIfGitIsDirty;PickGitBaseTag;InitializeSourceControlInformation" BeforeTargets="BeforeBuild;Build;CoreCompile;Publish;Pack">
+    <Target Name="ApplyGitInfo" DependsOnTargets="CheckIfGitIsDirty;PickGitBaseTag" BeforeTargets="InitializeSourceControlInformation;BeforeBuild;Build;CoreCompile;Publish;Pack">
 
         <!-- create  hashes to help identify what machine built the artifact -->
         <ItemGroup>
@@ -313,7 +313,7 @@
             <Version>$(VersionPrefix)$(GitSemVerMajor).$(GitSemVerMinor).$(GitSemVerPatch)$(VersionSuffix)</Version>
 
             <!-- nupkg versions want the +... part removed -->
-            <PackageVersion>$(Version.Split('+',2)[0])</PackageVersion>
+            <_PackageVersion>$(Version.Split('+',2)[0])</_PackageVersion>
 
             <!-- assembly versions don't support leading zeroes -->
             <GitSemVerMajorForAsmVer Condition="$(GitSemVerMajor.StartsWith('0'))">1$(GitSemVerMajor)</GitSemVerMajorForAsmVer>
@@ -328,6 +328,12 @@
         <!-- report version information to user -->
         <Message Importance="$(VersionNetInfoImportance)" Text="Version: $(Version)"/>
         <Message Importance="$(VersionNetInfoImportance)" Text="Commit: $(SourceRevisionId)"/>
+    </Target>
+    
+    <Target Name="SetPackageVersionBeforeBuild" BeforeTargets="Build" AfterTargets="ApplyGitInfo">
+        <PropertyGroup>
+            <PackageVersion>$(_PackageVersion)</PackageVersion>
+        </PropertyGroup>
     </Target>
     
     <Target Name="FixDependentProjectVersion" BeforeTargets="_GetProjectVersion">
